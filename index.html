@@ -109,13 +109,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <input type="text" id="search" placeholder="Buscar proveedor..." oninput="render()">
     <i class="ti ti-search si"></i>
   </div>
-  <div class="filter-group" id="filters">
-    <button class="filter-btn active" data-bank="Todos" onclick="setFilter('Todos',this)"><i class="ti ti-layout-grid" style="font-size:13px"></i>Todos</button>
-    <button class="filter-btn" data-bank="Banco General" onclick="setFilter('Banco General',this)">Banco General</button>
-    <button class="filter-btn" data-bank="BAC" onclick="setFilter('BAC',this)">BAC</button>
-    <button class="filter-btn" data-bank="Banistmo" onclick="setFilter('Banistmo',this)">Banistmo</button>
-    <button class="filter-btn" data-bank="Scotiabank" onclick="setFilter('Scotiabank',this)">Scotiabank</button>
-    <button class="filter-btn" data-bank="Lafise" onclick="setFilter('Lafise',this)">Lafise</button>
+  <div class="filter-group">
+    <button class="filter-btn active" onclick="setFilter('Todos',this)"><i class="ti ti-layout-grid" style="font-size:13px"></i>Todos</button>
+    <button class="filter-btn" onclick="setFilter('Banco General',this)">Banco General</button>
+    <button class="filter-btn" onclick="setFilter('BAC',this)">BAC</button>
+    <button class="filter-btn" onclick="setFilter('Banistmo',this)">Banistmo</button>
+    <button class="filter-btn" onclick="setFilter('Scotiabank',this)">Scotiabank</button>
+    <button class="filter-btn" onclick="setFilter('Lafise',this)">Lafise</button>
   </div>
   <select class="sort-select" id="sort" onchange="render()">
     <option value="az">Nombre A-Z</option>
@@ -178,215 +178,284 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://dnoanewokuudilujterx.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRub2FuZXdva3V1ZGlsdWp0ZXJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMjY1NTgsImV4cCI6MjA4OTgwMjU1OH0.DjB9eFHQqy2a3WruL8kZ0ShVnwOWfPbb6B5LE3NvVdE';
-const HEADERS = {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+var SURL = 'https://dnoanewokuudilujterx.supabase.co/rest/v1/proveedores';
+var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRub2FuZXdva3V1ZGlsdWp0ZXJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMjY1NTgsImV4cCI6MjA4OTgwMjU1OH0.DjB9eFHQqy2a3WruL8kZ0ShVnwOWfPbb6B5LE3NvVdE';
 
-const BANK_COLORS={'Banco General':'#0052CC','BAC':'#E8261A','Banistmo':'#F5A623','Scotiabank':'#EC111A','Lafise':'#1B6CA8','Multibank':'#006F3C','Global Bank':'#7B3FA0','Otro':'#555'};
-const AVATAR_COLORS=[['#1e3a5f','#60a5fa'],['#1e3a2f','#4ade80'],['#3b1e1e','#f87171'],['#3b2e0a','#fbbf24'],['#2d1e3b','#a78bfa'],['#1e3535','#2dd4bf']];
-
-function getAvatar(name){const i=(name.charCodeAt(0)+(name.charCodeAt(1)||0))%AVATAR_COLORS.length;return AVATAR_COLORS[i];}
-function initials(name){return name.split(/[\s,\.]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();}
-
-let proveedores=[];
-let activeFilter='Todos';
-let editId=null;
-let deleteId=null;
-const PER_PAGE=6;
-let page=1;
-
-async function apiFetch(path,opts={}){
-  const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:{...HEADERS,...(opts.headers||{})},...opts});
-  if(!res.ok){const e=await res.text();throw new Error(e);}
-  if(res.status===204)return null;
-  return res.json();
+function getHeaders(extra) {
+  var h = {
+    'Content-Type': 'application/json',
+    'apikey': SKEY,
+    'Authorization': 'Bearer ' + SKEY
+  };
+  if (extra) { Object.keys(extra).forEach(function(k){ h[k] = extra[k]; }); }
+  return h;
 }
 
-async function loadProveedores(){
-  try{
-    proveedores=await apiFetch('proveedores?order=created_at.desc&select=*');
+async function dbGet() {
+  var r = await fetch(SURL + '?order=created_at.desc&select=*', { headers: getHeaders() });
+  return r.json();
+}
+async function dbInsert(data) {
+  var r = await fetch(SURL + '?select=*', {
+    method: 'POST',
+    headers: getHeaders({ 'Prefer': 'return=representation' }),
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { var e = await r.text(); throw new Error(e); }
+  return r.json();
+}
+async function dbUpdate(id, data) {
+  var r = await fetch(SURL + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: getHeaders({ 'Prefer': 'return=minimal' }),
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { var e = await r.text(); throw new Error(e); }
+}
+async function dbDelete(id) {
+  var r = await fetch(SURL + '?id=eq.' + id, {
+    method: 'DELETE',
+    headers: getHeaders({ 'Prefer': 'return=minimal' })
+  });
+  if (!r.ok) { var e = await r.text(); throw new Error(e); }
+}
+
+var BANK_COLORS = {'Banco General':'#0052CC','BAC':'#E8261A','Banistmo':'#F5A623','Scotiabank':'#EC111A','Lafise':'#1B6CA8','Multibank':'#006F3C','Global Bank':'#7B3FA0','Otro':'#555'};
+var AVATAR_COLORS = [['#1e3a5f','#60a5fa'],['#1e3a2f','#4ade80'],['#3b1e1e','#f87171'],['#3b2e0a','#fbbf24'],['#2d1e3b','#a78bfa'],['#1e3535','#2dd4bf']];
+
+function getAvatar(name) { var i = (name.charCodeAt(0) + (name.charCodeAt(1)||0)) % AVATAR_COLORS.length; return AVATAR_COLORS[i]; }
+function initials(name) { return name.split(/[\s,\.]+/).filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+
+var proveedores = [];
+var activeFilter = 'Todos';
+var editId = null;
+var deleteId = null;
+var PER_PAGE = 6;
+var page = 1;
+
+async function loadProveedores() {
+  try {
+    proveedores = await dbGet();
     render();
-  }catch(e){
-    document.getElementById('grid').innerHTML='<div class="empty"><i class="ti ti-wifi-off"></i>Error al cargar. Verifica la conexión.</div>';
-    console.error(e);
+  } catch(e) {
+    document.getElementById('grid').innerHTML = '<div class="empty"><i class="ti ti-wifi-off"></i>Error al cargar datos.</div>';
   }
 }
 
-function setFilter(bank,btn){activeFilter=bank;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');page=1;render();}
+function setFilter(bank, btn) {
+  activeFilter = bank;
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  page = 1;
+  render();
+}
 
-function filtered(){
-  const q=document.getElementById('search').value.toLowerCase();
-  const sort=document.getElementById('sort').value;
-  let list=proveedores.filter(p=>{
-    const matchBank=activeFilter==='Todos'||p.banco===activeFilter;
-    const matchQ=!q||[p.nombre,p.rubro,p.contacto,p.banco,p.ruc,p.email].some(v=>(v||'').toLowerCase().includes(q));
-    return matchBank&&matchQ;
+function filtered() {
+  var q = document.getElementById('search').value.toLowerCase();
+  var sort = document.getElementById('sort').value;
+  var list = proveedores.filter(function(p) {
+    var matchBank = activeFilter === 'Todos' || p.banco === activeFilter;
+    var matchQ = !q || [p.nombre,p.rubro,p.contacto,p.banco,p.ruc,p.email].some(function(v){ return (v||'').toLowerCase().includes(q); });
+    return matchBank && matchQ;
   });
-  if(sort==='az')list.sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  else if(sort==='za')list.sort((a,b)=>b.nombre.localeCompare(a.nombre));
-  else if(sort==='fav')list.sort((a,b)=>b.fav-a.fav||a.nombre.localeCompare(b.nombre));
-  else if(sort==='reciente')list.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if (sort==='az') list.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+  else if (sort==='za') list.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
+  else if (sort==='fav') list.sort(function(a,b){ return b.fav-a.fav || a.nombre.localeCompare(b.nombre); });
+  else if (sort==='reciente') list.sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
   return list;
 }
 
-function render(){
-  const list=filtered();
-  const total=Math.max(1,Math.ceil(list.length/PER_PAGE));
-  if(page>total)page=total;
-  const slice=list.slice((page-1)*PER_PAGE,page*PER_PAGE);
-  const g=document.getElementById('grid');
-  if(!slice.length){g.innerHTML='<div class="empty"><i class="ti ti-search-off"></i>Sin resultados</div>';document.getElementById('pagination').innerHTML='';return;}
-  g.innerHTML=slice.map(p=>{
-    const [abg,afg]=getAvatar(p.nombre);
-    const accent=BANK_COLORS[p.banco]||'#555';
-    const favBadge=p.fav?`<span class="badge badge-fav"><i class="ti ti-star-filled" style="font-size:10px"></i>Favorito</span>`:`<span class="badge badge-${(p.estado||'activo').toLowerCase()}"><i class="ti ti-circle-filled" style="font-size:8px"></i>${p.estado||'Activo'}</span>`;
-    return`<div class="card">
-  <div class="card-accent" style="background:${accent}"></div>
-  <div class="card-body">
-    <div class="card-head">
-      <div class="avatar" style="background:${abg};color:${afg}">${initials(p.nombre)}</div>
-      <div style="min-width:0;flex:1"><div class="card-title">${p.nombre}</div><div class="card-rubro">${p.rubro||'Sin rubro definido'}</div></div>
-      ${favBadge}
-    </div>
-    <div class="info-grid">
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-building-bank"></i>Banco</span><span class="info-val">${p.banco||'—'}</span></div>
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-credit-card"></i>Tipo</span><span class="info-val">${p.tipo||'—'}</span></div>
-      <div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-hash"></i>Número de cuenta</span><span class="info-val">${p.cuenta||'—'}</span></div>
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-currency-dollar"></i>Moneda</span><span class="info-val">${p.moneda||'USD'}</span></div>
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-id"></i>RUC</span><span class="info-val">${p.ruc||'—'}</span></div>
-    </div>
-    <div class="contact-grid">
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-user"></i>Contacto</span><span class="info-val">${p.contacto||'—'}</span></div>
-      <div class="info-row"><span class="info-lbl"><i class="ti ti-phone"></i>Teléfono</span><span class="info-val">${p.tel||'—'}</span></div>
-      <div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-mail"></i>Correo</span><span class="info-val" style="font-size:11px">${p.email||'—'}</span></div>
-      ${p.notas?`<div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-notes"></i>Notas</span><span class="info-val" style="white-space:normal;font-size:11px;color:#aaa">${p.notas}</span></div>`:''}
-    </div>
-  </div>
-  <div class="card-actions">
-    <button class="act-btn" onclick="copyBankData(${p.id})"><i class="ti ti-copy" style="font-size:13px"></i>Copiar datos</button>
-    <button class="act-btn" onclick="openEdit(${p.id})"><i class="ti ti-edit" style="font-size:13px"></i>Editar</button>
-    <button class="act-btn fav-btn" onclick="toggleFav(${p.id},${p.fav})"><i class="ti ti-star${p.fav?'-filled':''}" style="font-size:13px"></i>${p.fav?'Quitar':'Favorito'}</button>
-    <button class="act-btn del-btn" onclick="askDelete(${p.id},'${p.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-trash" style="font-size:13px"></i></button>
-  </div>
-</div>`;
+function render() {
+  var list = filtered();
+  var total = Math.max(1, Math.ceil(list.length / PER_PAGE));
+  if (page > total) page = total;
+  var slice = list.slice((page-1)*PER_PAGE, page*PER_PAGE);
+  var g = document.getElementById('grid');
+  if (!slice.length) {
+    g.innerHTML = '<div class="empty"><i class="ti ti-search-off"></i>Sin resultados</div>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  g.innerHTML = slice.map(function(p) {
+    var av = getAvatar(p.nombre);
+    var abg = av[0]; var afg = av[1];
+    var accent = BANK_COLORS[p.banco] || '#555';
+    var est = (p.estado || 'Activo').toLowerCase();
+    var favBadge = p.fav
+      ? '<span class="badge badge-fav"><i class="ti ti-star-filled" style="font-size:10px"></i>Favorito</span>'
+      : '<span class="badge badge-' + est + '"><i class="ti ti-circle-filled" style="font-size:8px"></i>' + (p.estado||'Activo') + '</span>';
+    var notasHtml = p.notas ? '<div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-notes"></i>Notas</span><span class="info-val" style="white-space:normal;font-size:11px;color:#aaa">' + p.notas + '</span></div>' : '';
+    return '<div class="card">'
+      + '<div class="card-accent" style="background:' + accent + '"></div>'
+      + '<div class="card-body">'
+      + '<div class="card-head">'
+      + '<div class="avatar" style="background:' + abg + ';color:' + afg + '">' + initials(p.nombre) + '</div>'
+      + '<div style="min-width:0;flex:1"><div class="card-title">' + p.nombre + '</div><div class="card-rubro">' + (p.rubro||'Sin rubro') + '</div></div>'
+      + favBadge + '</div>'
+      + '<div class="info-grid">'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-building-bank"></i>Banco</span><span class="info-val">' + (p.banco||'—') + '</span></div>'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-credit-card"></i>Tipo</span><span class="info-val">' + (p.tipo||'—') + '</span></div>'
+      + '<div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-hash"></i>Número de cuenta</span><span class="info-val">' + (p.cuenta||'—') + '</span></div>'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-currency-dollar"></i>Moneda</span><span class="info-val">' + (p.moneda||'USD') + '</span></div>'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-id"></i>RUC</span><span class="info-val">' + (p.ruc||'—') + '</span></div>'
+      + '</div>'
+      + '<div class="contact-grid">'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-user"></i>Contacto</span><span class="info-val">' + (p.contacto||'—') + '</span></div>'
+      + '<div class="info-row"><span class="info-lbl"><i class="ti ti-phone"></i>Teléfono</span><span class="info-val">' + (p.tel||'—') + '</span></div>'
+      + '<div class="info-row" style="grid-column:1/-1"><span class="info-lbl"><i class="ti ti-mail"></i>Correo</span><span class="info-val" style="font-size:11px">' + (p.email||'—') + '</span></div>'
+      + notasHtml
+      + '</div></div>'
+      + '<div class="card-actions">'
+      + '<button class="act-btn" onclick="copyBankData(' + p.id + ')"><i class="ti ti-copy" style="font-size:13px"></i>Copiar datos</button>'
+      + '<button class="act-btn" onclick="openEdit(' + p.id + ')"><i class="ti ti-edit" style="font-size:13px"></i>Editar</button>'
+      + '<button class="act-btn fav-btn" onclick="toggleFav(' + p.id + ',' + (p.fav?'true':'false') + ')"><i class="ti ti-star' + (p.fav?'-filled':'') + '" style="font-size:13px"></i>' + (p.fav?'Quitar':'Favorito') + '</button>'
+      + '<button class="act-btn del-btn" onclick="askDelete(' + p.id + ')"><i class="ti ti-trash" style="font-size:13px"></i></button>'
+      + '</div></div>';
   }).join('');
   renderPagination(total);
 }
 
-function renderPagination(total){
-  const pg=document.getElementById('pagination');
-  if(total<=1){pg.innerHTML='';return;}
-  let btns='';
-  if(page>1)btns+=`<button class="pg-btn" onclick="goPage(${page-1})"><i class="ti ti-chevron-left" style="font-size:14px"></i></button>`;
-  for(let i=1;i<=total;i++){
-    if(i===1||i===total||Math.abs(i-page)<=1)btns+=`<button class="pg-btn${i===page?' active':''}" onclick="goPage(${i})">${i}</button>`;
-    else if(Math.abs(i-page)===2)btns+=`<span style="color:#555;padding:0 4px;align-self:center">…</span>`;
+function renderPagination(total) {
+  var pg = document.getElementById('pagination');
+  if (total <= 1) { pg.innerHTML = ''; return; }
+  var btns = '';
+  if (page > 1) btns += '<button class="pg-btn" onclick="goPage(' + (page-1) + ')"><i class="ti ti-chevron-left" style="font-size:14px"></i></button>';
+  for (var i=1; i<=total; i++) {
+    if (i===1||i===total||Math.abs(i-page)<=1) btns += '<button class="pg-btn' + (i===page?' active':'') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+    else if (Math.abs(i-page)===2) btns += '<span style="color:#555;padding:0 4px;align-self:center">…</span>';
   }
-  if(page<total)btns+=`<button class="pg-btn" onclick="goPage(${page+1})"><i class="ti ti-chevron-right" style="font-size:14px"></i></button>`;
-  pg.innerHTML=btns;
+  if (page < total) btns += '<button class="pg-btn" onclick="goPage(' + (page+1) + ')"><i class="ti ti-chevron-right" style="font-size:14px"></i></button>';
+  pg.innerHTML = btns;
 }
 
-function goPage(p){page=p;render();window.scrollTo({top:0,behavior:'smooth'});}
+function goPage(p) { page = p; render(); window.scrollTo({top:0,behavior:'smooth'}); }
 
-async function toggleFav(id,current){
-  try{
-    await apiFetch(`proveedores?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({fav:!current})});
-    const p=proveedores.find(x=>x.id===id);
-    p.fav=!current;
+async function toggleFav(id, current) {
+  try {
+    await dbUpdate(id, {fav: !current});
+    var p = proveedores.find(function(x){ return x.id===id; });
+    p.fav = !current;
     render();
-    showToast(!current?'⭐ Marcado como favorito':'Favorito eliminado');
-  }catch(e){showToast('Error al actualizar');}
+    showToast(!current ? '⭐ Marcado como favorito' : 'Favorito eliminado');
+  } catch(e) { showToast('Error al actualizar'); }
 }
 
-function copyBankData(id){
-  const p=proveedores.find(x=>x.id===id);
-  const txt=`Beneficiario: ${p.nombre}\nBanco: ${p.banco}\nTipo de cuenta: ${p.tipo}\nNúmero de cuenta: ${p.cuenta}\nMoneda: ${p.moneda}\nRUC: ${p.ruc}`;
-  navigator.clipboard.writeText(txt).then(()=>showToast('Datos bancarios copiados')).catch(()=>showToast('No se pudo copiar'));
+function copyBankData(id) {
+  var p = proveedores.find(function(x){ return x.id===id; });
+  var txt = 'Beneficiario: ' + p.nombre + '\nBanco: ' + p.banco + '\nTipo de cuenta: ' + p.tipo + '\nNúmero de cuenta: ' + p.cuenta + '\nMoneda: ' + p.moneda + '\nRUC: ' + p.ruc;
+  navigator.clipboard.writeText(txt).then(function(){ showToast('Datos bancarios copiados'); }).catch(function(){ showToast('No se pudo copiar'); });
 }
 
-function askDelete(id,nombre){
-  deleteId=id;
-  document.getElementById('confirm-msg').textContent=`¿Eliminar a "${nombre}"? Esta acción no se puede deshacer.`;
+function askDelete(id) {
+  deleteId = id;
+  var p = proveedores.find(function(x){ return x.id===id; });
+  document.getElementById('confirm-msg').textContent = 'Eliminar a "' + p.nombre + '"? Esta acción no se puede deshacer.';
   document.getElementById('confirm').classList.add('open');
 }
-function closeConfirm(e){if(!e||e.target===document.getElementById('confirm')){document.getElementById('confirm').classList.remove('open');deleteId=null;}}
-
-async function confirmDelete(){
-  try{
-    await apiFetch(`proveedores?id=eq.${deleteId}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
-    proveedores=proveedores.filter(x=>x.id!==deleteId);
+function closeConfirm(e) {
+  if (!e || e.target===document.getElementById('confirm')) {
+    document.getElementById('confirm').classList.remove('open');
+    deleteId = null;
+  }
+}
+async function confirmDelete() {
+  try {
+    await dbDelete(deleteId);
+    proveedores = proveedores.filter(function(x){ return x.id !== deleteId; });
     render();
     showToast('Proveedor eliminado');
-  }catch(e){showToast('Error al eliminar');}
+  } catch(e) { showToast('Error al eliminar'); }
   document.getElementById('confirm').classList.remove('open');
-  deleteId=null;
+  deleteId = null;
 }
 
-function showToast(msg){
-  const t=document.getElementById('toast');
-  t.innerHTML=`<i class="ti ti-check" style="font-size:16px;color:#4ade80"></i>${msg}`;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.innerHTML = '<i class="ti ti-check" style="font-size:16px;color:#4ade80"></i>' + msg;
   t.classList.add('show');
   clearTimeout(t._t);
-  t._t=setTimeout(()=>t.classList.remove('show'),2600);
+  t._t = setTimeout(function(){ t.classList.remove('show'); }, 2600);
 }
 
-function clearForm(){
-  ['nombre','rubro','cuenta','contacto','tel','email','ruc','notas'].forEach(f=>document.getElementById('f-'+f).value='');
-  document.getElementById('f-banco').value='Banco General';
-  document.getElementById('f-tipo').value='Cuenta Corriente';
-  document.getElementById('f-moneda').value='USD';
-  document.getElementById('f-estado').value='Activo';
+function clearForm() {
+  ['nombre','rubro','cuenta','contacto','tel','email','ruc','notas'].forEach(function(f){ document.getElementById('f-'+f).value=''; });
+  document.getElementById('f-banco').value = 'Banco General';
+  document.getElementById('f-tipo').value = 'Cuenta Corriente';
+  document.getElementById('f-moneda').value = 'USD';
+  document.getElementById('f-estado').value = 'Activo';
 }
 
-function openModal(){editId=null;document.getElementById('modal-title').textContent='Nuevo proveedor';clearForm();document.getElementById('modal').classList.add('open');setTimeout(()=>document.getElementById('f-nombre').focus(),100);}
+function openModal() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Nuevo proveedor';
+  clearForm();
+  document.getElementById('modal').classList.add('open');
+  setTimeout(function(){ document.getElementById('f-nombre').focus(); }, 100);
+}
 
-function openEdit(id){
-  editId=id;
-  const p=proveedores.find(x=>x.id===id);
-  document.getElementById('modal-title').textContent='Editar proveedor';
-  document.getElementById('f-nombre').value=p.nombre||'';
-  document.getElementById('f-rubro').value=p.rubro||'';
-  document.getElementById('f-banco').value=p.banco||'Banco General';
-  document.getElementById('f-tipo').value=p.tipo||'Cuenta Corriente';
-  document.getElementById('f-cuenta').value=p.cuenta||'';
-  document.getElementById('f-moneda').value=p.moneda||'USD';
-  document.getElementById('f-contacto').value=p.contacto||'';
-  document.getElementById('f-tel').value=p.tel||'';
-  document.getElementById('f-email').value=p.email||'';
-  document.getElementById('f-ruc').value=p.ruc||'';
-  document.getElementById('f-estado').value=p.estado||'Activo';
-  document.getElementById('f-notas').value=p.notas||'';
+function openEdit(id) {
+  editId = id;
+  var p = proveedores.find(function(x){ return x.id===id; });
+  document.getElementById('modal-title').textContent = 'Editar proveedor';
+  document.getElementById('f-nombre').value = p.nombre||'';
+  document.getElementById('f-rubro').value = p.rubro||'';
+  document.getElementById('f-banco').value = p.banco||'Banco General';
+  document.getElementById('f-tipo').value = p.tipo||'Cuenta Corriente';
+  document.getElementById('f-cuenta').value = p.cuenta||'';
+  document.getElementById('f-moneda').value = p.moneda||'USD';
+  document.getElementById('f-contacto').value = p.contacto||'';
+  document.getElementById('f-tel').value = p.tel||'';
+  document.getElementById('f-email').value = p.email||'';
+  document.getElementById('f-ruc').value = p.ruc||'';
+  document.getElementById('f-estado').value = p.estado||'Activo';
+  document.getElementById('f-notas').value = p.notas||'';
   document.getElementById('modal').classList.add('open');
 }
 
-function closeModal(){document.getElementById('modal').classList.remove('open');}
-function handleOverlayClick(e){if(e.target===document.getElementById('modal'))closeModal();}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function handleOverlayClick(e) { if (e.target===document.getElementById('modal')) closeModal(); }
 
-async function saveProveedor(){
-  const nombre=document.getElementById('f-nombre').value.trim();
-  if(!nombre){document.getElementById('f-nombre').focus();showToast('⚠️ El nombre es obligatorio');return;}
-  const data={nombre,rubro:document.getElementById('f-rubro').value.trim(),banco:document.getElementById('f-banco').value,tipo:document.getElementById('f-tipo').value,cuenta:document.getElementById('f-cuenta').value.trim(),moneda:document.getElementById('f-moneda').value,contacto:document.getElementById('f-contacto').value.trim(),tel:document.getElementById('f-tel').value.trim(),email:document.getElementById('f-email').value.trim(),ruc:document.getElementById('f-ruc').value.trim(),estado:document.getElementById('f-estado').value,notas:document.getElementById('f-notas').value.trim()};
-  const btn=document.getElementById('btn-save');
-  btn.disabled=true;
-  try{
-    if(editId){
-      await apiFetch(`proveedores?id=eq.${editId}`,{method:'PATCH',body:JSON.stringify(data)});
-      const idx=proveedores.findIndex(x=>x.id===editId);
-      proveedores[idx]={...proveedores[idx],...data};
+async function saveProveedor() {
+  var nombre = document.getElementById('f-nombre').value.trim();
+  if (!nombre) { document.getElementById('f-nombre').focus(); showToast('El nombre es obligatorio'); return; }
+  var data = {
+    nombre: nombre,
+    rubro: document.getElementById('f-rubro').value.trim(),
+    banco: document.getElementById('f-banco').value,
+    tipo: document.getElementById('f-tipo').value,
+    cuenta: document.getElementById('f-cuenta').value.trim(),
+    moneda: document.getElementById('f-moneda').value,
+    contacto: document.getElementById('f-contacto').value.trim(),
+    tel: document.getElementById('f-tel').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    ruc: document.getElementById('f-ruc').value.trim(),
+    estado: document.getElementById('f-estado').value,
+    notas: document.getElementById('f-notas').value.trim()
+  };
+  var btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  try {
+    if (editId) {
+      await dbUpdate(editId, data);
+      var idx = proveedores.findIndex(function(x){ return x.id===editId; });
+      proveedores[idx] = Object.assign({}, proveedores[idx], data);
       showToast('Proveedor actualizado');
-    }else{
-      const result=await apiFetch('proveedores?select=*',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(data)});
+    } else {
+      var result = await dbInsert(data);
       proveedores.unshift(result[0]);
       showToast('Proveedor guardado');
     }
     closeModal();
-    page=1;
+    page = 1;
     render();
-  }catch(e){showToast('Error al guardar. Intenta de nuevo.');console.error(e);}
-  btn.disabled=false;
+  } catch(e) {
+    console.error(e);
+    showToast('Error al guardar: ' + e.message);
+  }
+  btn.disabled = false;
 }
 
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeConfirm();}});
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeModal(); closeConfirm(); } });
 loadProveedores();
 </script>
 </body>
